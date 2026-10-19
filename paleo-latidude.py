@@ -218,7 +218,6 @@ def get_age_bounds(df):
         lo = hi = df['age']
     return lo.astype(float), hi.astype(float)
 
-
 def vector_export(fig, base_name, key):
     c1, c2 = st.columns(2)
     for col, fmt, mime, label in [
@@ -227,11 +226,16 @@ def vector_export(fig, base_name, key):
     ]:
         with col:
             try:
+                # 尝试使用 kaleido 导出
                 payload = fig.to_image(format=fmt, engine='kaleido', scale=2)
                 st.download_button(label, data=payload, file_name=f'{base_name}.{fmt}', mime=mime, key=f'{key}_{fmt}')
             except Exception as exc:
-                st.download_button(label + '（不可用）', data=f'导出失败：{exc}'.encode('utf-8'), file_name=f'{base_name}_{fmt}_export_error.txt', mime='text/plain', key=f'{key}_{fmt}_error')
-                st.caption('矢量导出需要安装兼容版本的 kaleido：`python -m pip install -U kaleido`。')
+                # 如果云端导出失败，提供一个更友好的提示和替代方案
+                st.error(f"云端环境暂时无法生成矢量文件（{fmt.upper()}）。")
+                st.caption("你可以直接下载下方的 CSV 数据表，或尝试在本地运行应用以使用矢量导出功能。")
+                # 你甚至可以在这里直接嵌入一个下载核心数据的按钮
+                # st.download_button("下载核心数据 CSV", data=..., ...)
+
 
 
 def polish_figure(fig, *, height=None):
