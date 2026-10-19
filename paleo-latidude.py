@@ -54,7 +54,10 @@ hr { border-color: var(--pm-border); }
 """, unsafe_allow_html=True)
 st.title("Paleolatitude and Paleomagnetic Pole Analysis")
 st.caption("APWP paleolatitude curves · Schmidt equal-area stereonet · equal-paleolatitude small-circle comparison")
-st.markdown("<div style='height:4px;background:linear-gradient(90deg,#176b87,#76b7c5,#dcecf0);border-radius:6px;margin:0 0 1.15rem 0'></div>", unsafe_allow_html=True)
+st.markdown(
+    "<div style='height:4px;background:linear-gradient(90deg,#176b87,#76b7c5,#dcecf0);border-radius:6px;margin:0 0 1.15rem 0'></div>",
+    unsafe_allow_html=True)
+
 
 # ----------------------------- Utilities -----------------------------
 def norm_lon(lon):
@@ -87,7 +90,6 @@ def read_table(uploaded) -> pd.DataFrame:
     raw = uploaded.getvalue()
     if name.endswith(('.xlsx', '.xls')):
         return pd.read_excel(io.BytesIO(raw))
-    # Try normal CSV parsing first, then delimiter autodetection.
     try:
         df = pd.read_csv(io.BytesIO(raw))
         if df.shape[1] == 1:
@@ -102,7 +104,6 @@ def clean_colname(c):
 
 
 def make_unique_columns(columns):
-    """Normalize duplicate headers so df['field'] always returns one Series."""
     used = {}
     result = []
     for col in columns:
@@ -115,11 +116,11 @@ def make_unique_columns(columns):
 
 def standardize_apwp(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
-    # If pandas interpreted a headerless numeric first row as column names, restore it.
-    if len(df.columns) >= 4 and all(pd.to_numeric(str(c), errors='coerce') == pd.to_numeric(str(c), errors='coerce') for c in df.columns[:4]):
+    if len(df.columns) >= 4 and all(
+            pd.to_numeric(str(c), errors='coerce') == pd.to_numeric(str(c), errors='coerce') for c in df.columns[:4]):
         first = pd.DataFrame([[pd.to_numeric(str(c), errors='coerce') for c in df.columns]], columns=df.columns)
         df = pd.concat([first, df], ignore_index=True)
-        df.columns = [f'col_{i+1}' for i in range(len(df.columns))]
+        df.columns = [f'col_{i + 1}' for i in range(len(df.columns))]
     df.columns = make_unique_columns(df.columns)
     aliases = {
         'longitude': ['longitude', 'lon', 'plon', 'pole_lon', 'pole_longitude', 'long'],
@@ -139,9 +140,7 @@ def standardize_apwp(df: pd.DataFrame) -> pd.DataFrame:
                     rename[col] = target
                     break
     df = df.rename(columns=rename)
-    # Common four-column headerless APWP: longitude, latitude, A95, age.
     if not {'longitude', 'latitude', 'age'}.issubset(df.columns) and df.shape[1] >= 4:
-        # Only use positional fallback if the three essential fields cannot be identified.
         df = df.iloc[:, :max(4, min(df.shape[1], 8))].copy()
         cols = list(df.columns)
         positional = {cols[0]: 'longitude', cols[1]: 'latitude', cols[2]: 'a95', cols[3]: 'age'}
@@ -152,22 +151,23 @@ def standardize_apwp(df: pd.DataFrame) -> pd.DataFrame:
     required = {'longitude', 'latitude', 'age'}
     missing = required - set(df.columns)
     if missing:
-        raise ValueError('APWP 表格无法识别必要字段：' + ', '.join(sorted(missing)) + '。至少需要 longitude、latitude、age。')
+        raise ValueError(
+            'APWP 表格无法识别必要字段：' + ', '.join(sorted(missing)) + '。至少需要 longitude、latitude、age。')
     df = df.dropna(subset=['longitude', 'latitude', 'age'])
     df['longitude'] = norm_lon(df['longitude'])
     df['latitude'] = df['latitude'].clip(-90, 90)
     if 'label' not in df.columns:
-        df['label'] = [f'APWP {i+1}' for i in range(len(df))]
+        df['label'] = [f'APWP {i + 1}' for i in range(len(df))]
     return df.reset_index(drop=True)
 
 
 def standardize_database(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
-    # If pandas interpreted a headerless numeric first row as column names, restore it.
-    if len(df.columns) >= 3 and all(pd.to_numeric(str(c), errors='coerce') == pd.to_numeric(str(c), errors='coerce') for c in df.columns[:3]):
+    if len(df.columns) >= 3 and all(
+            pd.to_numeric(str(c), errors='coerce') == pd.to_numeric(str(c), errors='coerce') for c in df.columns[:3]):
         first = pd.DataFrame([[pd.to_numeric(str(c), errors='coerce') for c in df.columns]], columns=df.columns)
         df = pd.concat([first, df], ignore_index=True)
-        df.columns = [f'col_{i+1}' for i in range(len(df.columns))]
+        df.columns = [f'col_{i + 1}' for i in range(len(df.columns))]
     df.columns = make_unique_columns(df.columns)
     aliases = {
         'pole_lat': ['pole_lat', 'plat', 'latitude', 'lat', 'pole_latitude', 'p_lat'],
@@ -189,7 +189,6 @@ def standardize_database(df: pd.DataFrame) -> pd.DataFrame:
     df = df.rename(columns=rename)
     if not {'pole_lat', 'pole_lon', 'age'}.issubset(df.columns) and df.shape[1] >= 3:
         cols = list(df.columns)
-        # Historical database convention: first columns plat, plon, age.
         df = df.rename(columns={cols[0]: 'pole_lat', cols[1]: 'pole_lon', cols[2]: 'age'})
     for c in ['pole_lat', 'pole_lon', 'age', 'a95', 'min_age', 'max_age', 'age_error']:
         if c in df.columns:
@@ -197,12 +196,13 @@ def standardize_database(df: pd.DataFrame) -> pd.DataFrame:
     required = {'pole_lat', 'pole_lon', 'age'}
     missing = required - set(df.columns)
     if missing:
-        raise ValueError('Research database 无法识别必要字段：' + ', '.join(sorted(missing)) + '。至少需要 plat/pole_lat、plon/pole_lon 和 age。')
+        raise ValueError('Research database 无法识别必要字段：' + ', '.join(
+            sorted(missing)) + '。至少需要 plat/pole_lat、plon/pole_lon 和 age。')
     df = df.dropna(subset=['pole_lat', 'pole_lon', 'age'])
     df['pole_lat'] = df['pole_lat'].clip(-90, 90)
     df['pole_lon'] = norm_lon(df['pole_lon'])
     if 'name' not in df.columns:
-        df['name'] = [f'Database {i+1}' for i in range(len(df))]
+        df['name'] = [f'Database {i + 1}' for i in range(len(df))]
     df['name'] = df['name'].fillna('').astype(str)
     return df.reset_index(drop=True)
 
@@ -218,6 +218,7 @@ def get_age_bounds(df):
         lo = hi = df['age']
     return lo.astype(float), hi.astype(float)
 
+
 def vector_export(fig, base_name, key):
     c1, c2 = st.columns(2)
     for col, fmt, mime, label in [
@@ -226,20 +227,17 @@ def vector_export(fig, base_name, key):
     ]:
         with col:
             try:
-                # 尝试使用 kaleido 导出
                 payload = fig.to_image(format=fmt, engine='kaleido', scale=2)
                 st.download_button(label, data=payload, file_name=f'{base_name}.{fmt}', mime=mime, key=f'{key}_{fmt}')
             except Exception as exc:
-                # 如果云端导出失败，提供一个更友好的提示和替代方案
-                st.error(f"云端环境暂时无法生成矢量文件（{fmt.upper()}）。")
-                st.caption("你可以直接下载下方的 CSV 数据表，或尝试在本地运行应用以使用矢量导出功能。")
-                # 你甚至可以在这里直接嵌入一个下载核心数据的按钮
-                # st.download_button("下载核心数据 CSV", data=..., ...)
-
+                st.download_button(label + '（不可用）', data=f'导出失败：{exc}'.encode('utf-8'),
+                                   file_name=f'{base_name}_{fmt}_export_error.txt', mime='text/plain',
+                                   key=f'{key}_{fmt}_error')
+                st.caption(
+                    '☁️ 云端环境可能暂不支持直接生成。💡 **替代方案**：请点击图表右上角的 **相机图标** 下载 PNG 图片，或使用浏览器的 **打印功能（Ctrl+P / Cmd+P）** 将网页保存为 PDF。')
 
 
 def polish_figure(fig, *, height=None):
-    """Apply a consistent, publication-friendly style to Plotly figures."""
     layout = dict(
         template="plotly_white",
         paper_bgcolor="rgba(255,255,255,0)",
@@ -263,22 +261,21 @@ def polish_figure(fig, *, height=None):
 
 
 def add_circle(fig, radius_deg, name, color, ref_lat, ref_lon, n=361):
-    """Add equal-angular-distance small circle centered on the geographic reference point."""
     if radius_deg < 1e-8:
         return
     bearings = np.linspace(0, 360, n)
     lat1, lon1, d = np.radians([ref_lat, ref_lon, radius_deg])
     br = np.radians(bearings)
-    lat2 = np.arcsin(np.clip(np.sin(lat1)*np.cos(d) + np.cos(lat1)*np.sin(d)*np.cos(br), -1, 1))
-    lon2 = lon1 + np.arctan2(np.sin(br)*np.sin(d)*np.cos(lat1), np.cos(d)-np.sin(lat1)*np.sin(lat2))
+    lat2 = np.arcsin(np.clip(np.sin(lat1) * np.cos(d) + np.cos(lat1) * np.sin(d) * np.cos(br), -1, 1))
+    lon2 = lon1 + np.arctan2(np.sin(br) * np.sin(d) * np.cos(lat1), np.cos(d) - np.sin(lat1) * np.sin(lat2))
     lats, lons = np.degrees(lat2), np.degrees(lon2)
     xs, ys = [], []
-    # Fold antipodal hemispheres onto the upper hemisphere, breaking lines at the fold.
     prev_hemi = None
     for lat, lon in zip(lats, lons):
         hemi = lat >= 0
         if prev_hemi is not None and hemi != prev_hemi:
-            xs.append(None); ys.append(None)
+            xs.append(None);
+            ys.append(None)
         if not hemi:
             lat, lon = antipode(lat, lon)
         r = math.sqrt(2.0) * math.sin(math.radians(90.0 - abs(float(lat))) / 2.0)
@@ -289,19 +286,12 @@ def add_circle(fig, radius_deg, name, color, ref_lat, ref_lon, n=361):
 
 
 def add_confidence_circle(fig, pole_lat, pole_lon, a95, name, color, showlegend=False, n=181):
-    """Draw an A95 confidence cone boundary around a pole on the Schmidt net.
-
-    A95 is treated as an angular radius on the sphere. Southern-hemisphere
-    poles are folded to their antipodes for display, matching the main net.
-    """
     if pd.isna(a95) or not np.isfinite(float(a95)) or float(a95) <= 0:
         return
     radius_deg = min(float(a95), 180.0)
-    # Fold the centre into the upper hemisphere before tracing its confidence cone.
     center_lat, center_lon = float(pole_lat), float(pole_lon)
     if center_lat < 0:
         center_lat, center_lon = float(antipode(center_lat, center_lon)[0]), float(antipode(center_lat, center_lon)[1])
-
     lat1, lon1, delta = np.radians([center_lat, center_lon, radius_deg])
     bearings = np.radians(np.linspace(0.0, 360.0, n))
     lat2 = np.arcsin(np.clip(
@@ -318,9 +308,7 @@ def add_confidence_circle(fig, pole_lat, pole_lon, a95, name, color, showlegend=
     for lat, lon in zip(circle_lats, circle_lons):
         is_north = lat >= 0
         if previous_hemi is not None and is_north != previous_hemi:
-            # Do not draw a false straight segment across the net when the circle
-            # crosses the equator and is folded to the antipodal hemisphere.
-            xs.append(None)
+            xs.append(None);
             ys.append(None)
         if not is_north:
             lat, lon = float(antipode(lat, lon)[0]), float(antipode(lat, lon)[1])
@@ -338,19 +326,22 @@ def add_confidence_circle(fig, pole_lat, pole_lon, a95, name, color, showlegend=
 
 def stereonet_figure(points, selected_indices=None, ref_lat=None, ref_lon=None, circle_rows=None):
     fig = go.Figure()
-    # Equal-area Schmidt net boundary and latitude circles.
-    theta = np.linspace(0, 2*np.pi, 721)
-    fig.add_trace(go.Scatter(x=np.cos(theta), y=np.sin(theta), mode='lines', line=dict(color='#222', width=1.5), name='Net boundary', hoverinfo='skip', showlegend=False))
+    theta = np.linspace(0, 2 * np.pi, 721)
+    fig.add_trace(go.Scatter(x=np.cos(theta), y=np.sin(theta), mode='lines', line=dict(color='#222', width=1.5),
+                             name='Net boundary', hoverinfo='skip', showlegend=False))
     for lat in [0, 15, 30, 45, 60, 75]:
-        r = math.sqrt(2.0) * math.sin(math.radians(90-lat)/2.0)
-        fig.add_trace(go.Scatter(x=r*np.sin(theta), y=r*np.cos(theta), mode='lines', line=dict(color='#c8c8c8', width=0.7), hoverinfo='skip', showlegend=False, name=f'{lat}° latitude'))
+        r = math.sqrt(2.0) * math.sin(math.radians(90 - lat) / 2.0)
+        fig.add_trace(
+            go.Scatter(x=r * np.sin(theta), y=r * np.cos(theta), mode='lines', line=dict(color='#c8c8c8', width=0.7),
+                       hoverinfo='skip', showlegend=False, name=f'{lat}° latitude'))
     for lon in range(0, 360, 30):
         rr = np.linspace(0, 1, 100)
         rad = math.radians(lon)
-        fig.add_trace(go.Scatter(x=rr*np.sin(rad), y=rr*np.cos(rad), mode='lines', line=dict(color='#dedede', width=0.7), hoverinfo='skip', showlegend=False))
+        fig.add_trace(
+            go.Scatter(x=rr * np.sin(rad), y=rr * np.cos(rad), mode='lines', line=dict(color='#dedede', width=0.7),
+                       hoverinfo='skip', showlegend=False))
+
     if len(points):
-        # Plot A95 confidence-circle boundaries before the pole symbols so the
-        # symbols remain visible. Missing A95 values are intentionally skipped.
         legend_seen = set()
         for _, row in points.iterrows():
             if 'a95' not in row.index or pd.isna(row.get('a95')):
@@ -358,55 +349,80 @@ def stereonet_figure(points, selected_indices=None, ref_lat=None, ref_lon=None, 
             original_lat = float(row['pole_lat'])
             original_hemi = 'N' if original_lat >= 0 else 'S'
             circle_color = '#d62728' if original_hemi == 'N' else '#1f77b4'
+
+            # 如果数据点带有 marker_color，用它来画 A95 圆
+            if 'marker_color' in row.index and pd.notna(row['marker_color']):
+                circle_color = row['marker_color']
+
             legend_name = f'A95 confidence circle ({original_hemi} pole)'
             add_confidence_circle(
                 fig, row['pole_lat'], row['pole_lon'], row.get('a95'),
                 legend_name, circle_color, showlegend=legend_name not in legend_seen
             )
             legend_seen.add(legend_name)
+
         xs, ys, labels, custom, colors, symbols = [], [], [], [], [], []
         for _, row in points.iterrows():
             lat, lon = float(row['pole_lat']), float(row['pole_lon'])
             original_hemi = 'N' if lat >= 0 else 'S'
             if lat < 0:
                 lat, lon = antipode(lat, lon)
-            r = math.sqrt(2.0) * math.sin(math.radians(90.0-abs(lat))/2.0)
-            xs.append(r*math.sin(math.radians(lon)))
-            ys.append(r*math.cos(math.radians(lon)))
+            r = math.sqrt(2.0) * math.sin(math.radians(90.0 - abs(lat)) / 2.0)
+            xs.append(r * math.sin(math.radians(lon)))
+            ys.append(r * math.cos(math.radians(lon)))
             labels.append(str(row.get('label', row.get('name', 'pole'))))
-            custom.append([float(row['pole_lat']), float(row['pole_lon']), float(row['age']), original_hemi, float(row.get('paleolatitude', np.nan))])
-            colors.append('#d62728' if original_hemi == 'N' else '#1f77b4')
+            custom.append([float(row['pole_lat']), float(row['pole_lon']), float(row['age']), original_hemi,
+                           float(row.get('paleolatitude', np.nan)), str(row.get('source_file', 'Unknown'))])
+
+            # 默认颜色，如果提供了自定义颜色则使用自定义颜色
+            if 'marker_color' in row.index and pd.notna(row['marker_color']):
+                colors.append(row['marker_color'])
+            else:
+                colors.append('#d62728' if original_hemi == 'N' else '#1f77b4')
+
             symbols.append('circle' if original_hemi == 'N' else 'diamond')
+
         fig.add_trace(go.Scatter(x=xs, y=ys, mode='markers', name='Paleomagnetic poles', text=labels,
-            customdata=custom, marker=dict(size=9, color=colors, symbol=symbols, line=dict(color='white', width=0.7)),
-            hovertemplate='<b>%{text}</b><br>Age: %{customdata[2]:.2f} Ma<br>Original pole: %{customdata[0]:.2f}°, %{customdata[1]:.2f}°<br>Original hemisphere: %{customdata[3]}<br>Paleolatitude: %{customdata[4]:.2f}°<extra></extra>'))
+                                 customdata=custom,
+                                 marker=dict(size=10, color=colors, symbol=symbols, line=dict(color='white', width=1)),
+                                 hovertemplate='<b>%{text}</b><br>文件: %{customdata[5]}<br>Age: %{customdata[2]:.2f} Ma<br>Original pole: %{customdata[0]:.2f}°, %{customdata[1]:.2f}°<br>Original hemisphere: %{customdata[3]}<br>Paleolatitude: %{customdata[4]:.2f}°<extra></extra>'))
+
     if ref_lat is not None and ref_lon is not None:
         lat, lon = float(ref_lat), float(ref_lon)
         if lat < 0:
             lat, lon = antipode(lat, lon)
-        r = math.sqrt(2.0)*math.sin(math.radians(90.0-abs(lat))/2.0)
-        x, y = r*math.sin(math.radians(lon)), r*math.cos(math.radians(lon))
-        fig.add_trace(go.Scatter(x=[x], y=[y], mode='markers', name='Reference point (folded to upper hemisphere)', marker=dict(size=13, symbol='x', color='black'), hovertemplate=f'Reference point<br>{ref_lat:.2f}°, {ref_lon:.2f}°<extra></extra>'))
+        r = math.sqrt(2.0) * math.sin(math.radians(90.0 - abs(lat)) / 2.0)
+        x, y = r * math.sin(math.radians(lon)), r * math.cos(math.radians(lon))
+        fig.add_trace(go.Scatter(x=[x], y=[y], mode='markers', name='Reference point (folded to upper hemisphere)',
+                                 marker=dict(size=13, symbol='x', color='black'),
+                                 hovertemplate=f'Reference point<br>{ref_lat:.2f}°, {ref_lon:.2f}°<extra></extra>'))
     if circle_rows and ref_lat is not None and ref_lon is not None:
         for row, label, color in circle_rows:
             d = 90.0 - float(paleolatitude(row['pole_lat'], row['pole_lon'], ref_lat, ref_lon))
             add_circle(fig, d, label, color, ref_lat, ref_lon)
+
     fig.update_layout(title='Paleomagnetic poles — Schmidt equal-area stereonet',
-        xaxis=dict(visible=False, range=[-1.08, 1.08], scaleanchor='y', scaleratio=1, zeroline=False),
-        yaxis=dict(visible=False, range=[-1.08, 1.08], zeroline=False),
-        height=700, margin=dict(l=25,r=25,t=65,b=70),
-        legend=dict(orientation='h', y=-0.08, x=0.5, xanchor='center'))
+                      xaxis=dict(visible=False, range=[-1.08, 1.08], scaleanchor='y', scaleratio=1, zeroline=False),
+                      yaxis=dict(visible=False, range=[-1.08, 1.08], zeroline=False),
+                      height=700, margin=dict(l=25, r=25, t=65, b=70),
+                      legend=dict(orientation='h', y=-0.08, x=0.5, xanchor='center'))
     polish_figure(fig, height=700)
     return fig
 
+
 # ----------------------------- Sidebar -----------------------------
 st.sidebar.header('分析设置')
-ref_lat = st.sidebar.number_input('参考点纬度 (°)', value=36.27, min_value=-90.0, max_value=90.0, step=0.01, format='%.2f')
-ref_lon = st.sidebar.number_input('参考点经度 (°)', value=98.64, min_value=-180.0, max_value=180.0, step=0.01, format='%.2f')
+ref_lat = st.sidebar.number_input('参考点纬度 (°)', value=36.27, min_value=-90.0, max_value=90.0, step=0.01,
+                                  format='%.2f')
+ref_lon = st.sidebar.number_input('参考点经度 (°)', value=98.64, min_value=-180.0, max_value=180.0, step=0.01,
+                                  format='%.2f')
 st.sidebar.caption('古纬度按 λ = 90° − 球面角距计算；请确认输入极点的极性/半球约定。')
 
-apwp_uploads = st.file_uploader('上传 APWP 数据（可一次多选 CSV / Excel）', type=['csv','txt','xlsx','xls'], accept_multiple_files=True, key='apwp_uploads')
-db_upload = st.file_uploader('上传 Research database（CSV / Excel）', type=['csv','txt','xlsx','xls'], key='db_upload')
+apwp_uploads = st.file_uploader('上传 APWP 数据（可一次多选 CSV / Excel）', type=['csv', 'txt', 'xlsx', 'xls'],
+                                accept_multiple_files=True, key='apwp_uploads')
+# 修改：支持多文件上传
+db_uploads = st.file_uploader('上传 Research database（可一次多选 CSV / Excel）', type=['csv', 'txt', 'xlsx', 'xls'],
+                              accept_multiple_files=True, key='db_uploads')
 
 apwp = pd.DataFrame()
 database = pd.DataFrame()
@@ -416,7 +432,6 @@ if apwp_uploads:
         try:
             frame = standardize_apwp(read_table(uploaded_file))
             frame['source_file'] = uploaded_file.name
-            # Keep curves separate and make labels unambiguous when files are combined.
             frame['label'] = frame['label'].astype(str)
             frame['display_label'] = uploaded_file.name + ' | ' + frame['label']
             apwp_frames.append(frame)
@@ -427,27 +442,56 @@ if apwp_uploads:
         apwp = pd.concat(apwp_frames, ignore_index=True, sort=False)
         apwp['paleolatitude'] = paleolatitude(apwp['latitude'], apwp['longitude'], ref_lat, ref_lon)
         apwp['label'] = apwp['display_label']
-        st.info(f'APWP 合计：{len(apwp_frames)} 个文件，{len(apwp)} 行数据。绘图时将按文件分别显示曲线。')
-if db_upload is not None:
-    try:
-        incoming = standardize_database(read_table(db_upload))
-        fingerprint = hashlib.sha256(db_upload.getvalue()).hexdigest()[:16]
-        state_key = f'database_working_{fingerprint}'
-        if state_key not in st.session_state:
-            incoming['_record_id'] = [f'DB-{i+1:04d}' for i in range(len(incoming))]
-            incoming['flipped'] = False
-            st.session_state[state_key] = incoming
-        database = st.session_state[state_key].copy()
+
+if db_uploads:
+    db_frames = []
+    for uploaded_file in db_uploads:
+        try:
+            frame = standardize_database(read_table(uploaded_file))
+            frame['source_file'] = uploaded_file.name
+            # 生成全局唯一 ID，结合文件哈希和行号防止重复
+            fp = hashlib.sha256(uploaded_file.getvalue()).hexdigest()[:6]
+            frame['_record_id'] = [f"{fp}-{i + 1:04d}" for i in range(len(frame))]
+            db_frames.append(frame)
+            st.success(f'已载入 Research database：{uploaded_file.name}（{len(frame)} 行）')
+        except Exception as exc:
+            st.error(f'Research database 文件读取失败（{uploaded_file.name}）：{exc}')
+
+    if db_frames:
+        database = pd.concat(db_frames, ignore_index=True, sort=False)
+        database['flipped'] = False
+
+        # ----------------------------- Polarity reversal 状态管理 -----------------------------
+        if 'flipped_ids' not in st.session_state:
+            st.session_state['flipped_ids'] = set()
+
+        # 应用倒转状态
+        if len(database) > 0:
+            mask = database['_record_id'].isin(st.session_state['flipped_ids'])
+            if mask.any():
+                lat_new, lon_new = antipode(database.loc[mask, 'pole_lat'].to_numpy(),
+                                            database.loc[mask, 'pole_lon'].to_numpy())
+                database.loc[mask, 'pole_lat'] = lat_new
+                database.loc[mask, 'pole_lon'] = lon_new
+                database.loc[mask, 'flipped'] = True
+
         database['paleolatitude'] = paleolatitude(database['pole_lat'], database['pole_lon'], ref_lat, ref_lon)
         database['label'] = database['name'].astype(str) + ' [' + database['_record_id'].astype(str) + ']'
-        st.success(f'Research database 已载入：{len(database)} 行')
-    except Exception as exc:
-        st.error(f'Research database 文件读取失败：{exc}')
 
 if apwp.empty and database.empty:
     st.info('请先上传 APWP 数据、Research database，或两者都上传。')
-    st.markdown('**字段要求**：APWP 至少需要 `longitude`, `latitude`, `age`；Research database 至少需要 `plat`/`pole_lat`, `plon`/`pole_lon`, `age`。支持 CSV 和 Excel。')
+    st.markdown(
+        '**字段要求**：APWP 至少需要 `longitude`, `latitude`, `age`；Research database 至少需要 `plat`/`pole_lat`, `plon`/`pole_lon`, `age`。支持 CSV 和 Excel。')
     st.stop()
+
+# 生成数据库文件的颜色映射字典
+db_palette = ['#d66a52', '#ff7f0e', '#9467bd', '#2ca02c', '#17becf', '#e377c2', '#8c564b', '#bcbd22']
+db_color_map = {}
+if not database.empty:
+    unique_files = database['source_file'].unique()
+    for i, fname in enumerate(unique_files):
+        db_color_map[fname] = db_palette[i % len(db_palette)]
+    database['marker_color'] = database['source_file'].map(db_color_map)
 
 # Filter ages based on available datasets.
 ages = []
@@ -462,7 +506,8 @@ with st.sidebar:
         age_range = default_range
         st.caption(f'当前数据年龄：{min_data_age:g} Ma')
     else:
-        age_range = st.slider('年龄范围 (Ma)', min_value=float(min_data_age), max_value=float(max_data_age), value=default_range, step=max((max_data_age-min_data_age)/200, 0.01))
+        age_range = st.slider('年龄范围 (Ma)', min_value=float(min_data_age), max_value=float(max_data_age),
+                              value=default_range, step=max((max_data_age - min_data_age) / 200, 0.01))
     st.subheader('古纬度图 Y 轴')
     y_min = st.number_input('Y 轴最小值 (°)', value=-60.0, min_value=-90.0, max_value=90.0, step=5.0)
     y_max = st.number_input('Y 轴最大值 (°)', value=25.0, min_value=-90.0, max_value=90.0, step=5.0)
@@ -474,67 +519,47 @@ if y_min >= y_max:
 apwp_f = apwp[apwp['age'].between(*age_range)].copy() if not apwp.empty else apwp.copy()
 db_f = database[database['age'].between(*age_range)].copy() if not database.empty else database.copy()
 
-# ----------------------------- Polarity reversal -----------------------------
+# ----------------------------- Polarity reversal UI -----------------------------
 if not database.empty:
     st.subheader('Research database：手动极性倒转')
-    st.caption('勾选需要倒转的记录后点击按钮。倒转后的结果会保留在本次上传文件对应的会话状态中。')
+    st.caption('勾选需要倒转的记录后点击按钮。倒转后的结果会保留在会话中。')
     working = database.copy()
     if len(working):
-        options = {f"{r['_record_id']} — {r['name']} — {r['age']:g} Ma (pole {r['pole_lat']:.1f}°, {r['pole_lon']:.1f}°)": str(r['_record_id']) for _, r in working.iterrows()}
+        options = {
+            f"{r['source_file']} | {r['_record_id']} — {r['name']} — {r['age']:g} Ma (pole {r['pole_lat']:.1f}°, {r['pole_lon']:.1f}°)": str(
+                r['_record_id']) for _, r in working.iterrows()}
         selected_labels = st.multiselect('选择要倒转的记录', list(options.keys()), key='flip_select')
-        if st.button('倒转所选极点（对跖点）', key='flip_selected'):
-            state_key = next((k for k in st.session_state.keys() if k.startswith('database_working_') and any(str(v) in k for v in [])), None)
-            # Resolve state using uploaded file hash; this ensures updates persist on rerun.
-            fp = hashlib.sha256(db_upload.getvalue()).hexdigest()[:16] if db_upload is not None else None
-            state_key = f'database_working_{fp}' if fp else None
-            if state_key and state_key in st.session_state:
-                w = st.session_state[state_key].copy()
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button('倒转所选极点（对跖点）', key='flip_selected'):
                 ids = [options[s] for s in selected_labels]
-                mask = w['_record_id'].isin(ids)
-                lat_new, lon_new = antipode(w.loc[mask, 'pole_lat'].to_numpy(), w.loc[mask, 'pole_lon'].to_numpy())
-                w.loc[mask, 'pole_lat'] = lat_new
-                w.loc[mask, 'pole_lon'] = lon_new
-                w.loc[mask, 'flipped'] = ~w.loc[mask, 'flipped'].astype(bool)
-                st.session_state[state_key] = w
+                st.session_state['flipped_ids'].update(ids)
                 st.rerun()
-        if st.button('恢复数据库原始极点', key='reset_database'):
-            fp = hashlib.sha256(db_upload.getvalue()).hexdigest()[:16] if db_upload is not None else None
-            state_key = f'database_working_{fp}' if fp else None
-            if state_key and state_key in st.session_state:
-                original = standardize_database(read_table(db_upload))
-                original['_record_id'] = [f'DB-{i+1:04d}' for i in range(len(original))]
-                original['flipped'] = False
-                st.session_state[state_key] = original
+        with col2:
+            if st.button('恢复全部数据库原始极点', key='reset_database'):
+                st.session_state['flipped_ids'].clear()
                 st.rerun()
-
-# Refresh database after polarity interaction state has been applied.
-if db_upload is not None:
-    fp = hashlib.sha256(db_upload.getvalue()).hexdigest()[:16]
-    state_key = f'database_working_{fp}'
-    if state_key in st.session_state:
-        database = st.session_state[state_key].copy()
-        database['paleolatitude'] = paleolatitude(database['pole_lat'], database['pole_lon'], ref_lat, ref_lon)
-        database['label'] = database['name'].astype(str) + ' [' + database['_record_id'].astype(str) + ']'
-        db_f = database[database['age'].between(*age_range)].copy()
 
 # ----------------------------- Paleolatitude curve -----------------------------
 st.header('1. 古纬度—年代曲线')
 fig_curve = go.Figure()
 if not apwp_f.empty:
-    # Draw each uploaded APWP file as an independent curve, avoiding artificial
-    # connecting lines between unrelated datasets.
     palette = ['#176b87', '#8b5e83', '#3a7d44', '#c06c45', '#5b6abf', '#8a7a36', '#397f83', '#b0526f']
     if 'source_file' not in apwp_f.columns:
         apwp_f['source_file'] = 'APWP'
     for curve_index, (source_name, source_curve) in enumerate(apwp_f.groupby('source_file', sort=False, dropna=False)):
         curve = source_curve.sort_values('age', ascending=False).copy()
         color = palette[curve_index % len(palette)]
-        fill_color = f'rgba({int(color[1:3],16)},{int(color[3:5],16)},{int(color[5:7],16)},0.13)'
+        fill_color = f'rgba({int(color[1:3], 16)},{int(color[3:5], 16)},{int(color[5:7], 16)},0.13)'
         if 'a95' in curve.columns and curve['a95'].notna().any():
-            # Approximate paleolatitude uncertainty band; not rigorous spherical error propagation.
             err = curve['a95'].fillna(0).abs()
-            fig_curve.add_trace(go.Scatter(x=curve['age'], y=curve['paleolatitude'] + err, mode='lines', line=dict(width=0, color=color), showlegend=False, hoverinfo='skip', name=f'{source_name} A95 upper'))
-            fig_curve.add_trace(go.Scatter(x=curve['age'], y=curve['paleolatitude'] - err, mode='lines', line=dict(width=0, color=color), fill='tonexty', fillcolor=fill_color, showlegend=False, hoverinfo='skip', name=f'{source_name} approximate A95 band'))
+            fig_curve.add_trace(go.Scatter(x=curve['age'], y=curve['paleolatitude'] + err, mode='lines',
+                                           line=dict(width=0, color=color), showlegend=False, hoverinfo='skip',
+                                           name=f'{source_name} A95 upper'))
+            fig_curve.add_trace(go.Scatter(x=curve['age'], y=curve['paleolatitude'] - err, mode='lines',
+                                           line=dict(width=0, color=color), fill='tonexty', fillcolor=fill_color,
+                                           showlegend=False, hoverinfo='skip',
+                                           name=f'{source_name} approximate A95 band'))
         xerr = None
         lo, hi = get_age_bounds(curve)
         xerr_array = np.maximum(curve['age'].to_numpy() - lo.to_numpy(), hi.to_numpy() - curve['age'].to_numpy())
@@ -543,25 +568,54 @@ if not apwp_f.empty:
         yerr = None
         if 'a95' in curve.columns and curve['a95'].notna().any():
             yerr = dict(type='data', array=curve['a95'].fillna(0).abs().to_numpy(), visible=True, thickness=1, width=2)
-        fig_curve.add_trace(go.Scatter(x=curve['age'], y=curve['paleolatitude'], mode='lines+markers', name=str(source_name), text=curve['label'], error_x=xerr, error_y=yerr, marker=dict(size=7, color=color, line=dict(color='white', width=1)), line=dict(width=2.6, color=color), hovertemplate='%{text}<br>Age: %{x:.2f} Ma<br>Paleolatitude: %{y:.2f}°<extra></extra>'))
+        fig_curve.add_trace(
+            go.Scatter(x=curve['age'], y=curve['paleolatitude'], mode='lines+markers', name=str(source_name),
+                       text=curve['label'], error_x=xerr, error_y=yerr,
+                       marker=dict(size=7, color=color, line=dict(color='white', width=1)),
+                       line=dict(width=2.6, color=color),
+                       hovertemplate='%{text}<br>Age: %{x:.2f} Ma<br>Paleolatitude: %{y:.2f}°<extra></extra>'))
+
 if not db_f.empty:
-    db_lo, db_hi = get_age_bounds(db_f)
-    db_xerr_array = np.maximum(db_f['age'].to_numpy() - db_lo.to_numpy(), db_hi.to_numpy() - db_f['age'].to_numpy())
-    db_xerr = dict(type='data', array=db_xerr_array, visible=True, thickness=1, width=2) if np.any(db_xerr_array > 0) else None
-    db_yerr = None
-    if 'a95' in db_f.columns and db_f['a95'].notna().any():
-        db_yerr = dict(type='data', array=db_f['a95'].fillna(0).abs().to_numpy(), visible=True, thickness=1, width=2)
-    fig_curve.add_trace(go.Scatter(x=db_f['age'], y=db_f['paleolatitude'], mode='markers', name='Research database', text=db_f['label'], error_x=db_xerr, error_y=db_yerr, marker=dict(size=10, symbol='diamond', color='#d66a52', line=dict(color='white', width=1.1)), customdata=np.stack([db_f['pole_lat'], db_f['pole_lon']], axis=-1), hovertemplate='%{text}<br>Age: %{x:.2f} Ma<br>Paleolatitude: %{y:.2f}°<br>Pole: %{customdata[0]:.2f}°, %{customdata[1]:.2f}°<extra></extra>'))
-fig_curve.update_layout(title='Paleolatitude versus age', xaxis_title='Age (Ma)', yaxis_title='Paleolatitude (°)', hovermode='closest')
+    # 按文件分组绘制，以区分颜色
+    for source_name, source_df in db_f.groupby('source_file', sort=False, dropna=False):
+        db_lo, db_hi = get_age_bounds(source_df)
+        db_xerr_array = np.maximum(source_df['age'].to_numpy() - db_lo.to_numpy(),
+                                   db_hi.to_numpy() - source_df['age'].to_numpy())
+        db_xerr = dict(type='data', array=db_xerr_array, visible=True, thickness=1, width=2) if np.any(
+            db_xerr_array > 0) else None
+        db_yerr = None
+        if 'a95' in source_df.columns and source_df['a95'].notna().any():
+            db_yerr = dict(type='data', array=source_df['a95'].fillna(0).abs().to_numpy(), visible=True, thickness=1,
+                           width=2)
+
+        color = db_color_map.get(source_name, '#d66a52')
+
+        fig_curve.add_trace(go.Scatter(
+            x=source_df['age'], y=source_df['paleolatitude'], mode='markers', name=f"DB: {source_name}",
+            text=source_df['label'], error_x=db_xerr, error_y=db_yerr,
+            marker=dict(size=10, symbol='diamond', color=color, line=dict(color='white', width=1.1)),
+            customdata=np.stack([source_df['pole_lat'], source_df['pole_lon']], axis=-1),
+            hovertemplate=f'<b>{source_name}</b><br>%{{text}}<br>Age: %{{x:.2f}} Ma<br>Paleolatitude: %{{y:.2f}}°<br>Pole: %{{customdata[0]:.2f}}°, %{{customdata[1]:.2f}}°<extra></extra>'
+        ))
+
+fig_curve.update_layout(title='Paleolatitude versus age', xaxis_title='Age (Ma)', yaxis_title='Paleolatitude (°)',
+                        hovermode='closest')
 polish_figure(fig_curve, height=590)
-fig_curve.update_xaxes(autorange='reversed', showgrid=True, gridcolor='#e7edf1', gridwidth=0.8, zeroline=False, ticks='outside', tickcolor='#8797a3', linecolor='#aab8c2', mirror=False)
-fig_curve.update_yaxes(range=[y_min, y_max], showgrid=True, gridcolor='#e7edf1', gridwidth=0.8, zeroline=True, zerolinecolor='#8b9aa5', zerolinewidth=1.1, ticks='outside', tickcolor='#8797a3', linecolor='#aab8c2')
-st.plotly_chart(fig_curve, use_container_width=True, config={"displaylogo": False, "responsive": True, "toImageButtonOptions": {"format": "svg", "filename": "paleolatitude_age_curve", "scale": 2}})
+fig_curve.update_xaxes(autorange='reversed', showgrid=True, gridcolor='#e7edf1', gridwidth=0.8, zeroline=False,
+                       ticks='outside', tickcolor='#8797a3', linecolor='#aab8c2', mirror=False)
+fig_curve.update_yaxes(range=[y_min, y_max], showgrid=True, gridcolor='#e7edf1', gridwidth=0.8, zeroline=True,
+                       zerolinecolor='#8b9aa5', zerolinewidth=1.1, ticks='outside', tickcolor='#8797a3',
+                       linecolor='#aab8c2')
+st.plotly_chart(fig_curve, use_container_width=True, config={"displaylogo": False, "responsive": True,
+                                                             "toImageButtonOptions": {"format": "svg",
+                                                                                      "filename": "paleolatitude_age_curve",
+                                                                                      "scale": 2}})
 vector_export(fig_curve, 'paleolatitude_age_curve', 'curve_export')
 
 # ----------------------------- Stereonet -----------------------------
 st.header('2. 古地磁极赤平投影图')
-st.caption('采用 Schmidt 等面积投影。具有 A95 数据的极点显示相应的 95% 置信圆；为便于在同一网图中比较，南半球极点以其对跖点折叠到上半球。悬停可查看原始极点坐标和半球。红色圆点代表原始北半球极点，蓝色菱形代表原始南半球极点。')
+st.caption(
+    '采用 Schmidt 等面积投影。具有 A95 数据的极点显示相应的 95% 置信圆；为便于在同一网图中比较，南半球极点以其对跖点折叠到上半球。悬停可查看原始极点坐标和半球。红色/彩色代表来自不同 Research database 文件，蓝色菱形等形状代表半球。')
 point_frames = []
 if not apwp_f.empty:
     apwp_cols = ['latitude', 'longitude', 'age', 'paleolatitude', 'label']
@@ -570,11 +624,13 @@ if not apwp_f.empty:
     t = apwp_f[apwp_cols].copy()
     if 'a95' not in t.columns:
         t['a95'] = np.nan
-    t = t.rename(columns={'latitude':'pole_lat','longitude':'pole_lon'})
+    t = t.rename(columns={'latitude': 'pole_lat', 'longitude': 'pole_lon'})
     t['source'] = 'APWP'
+    t['source_file'] = t['label'].str.split('|').str[0].str.strip()  # 提取文件名
     point_frames.append(t)
+
 if not db_f.empty:
-    db_cols = ['pole_lat', 'pole_lon', 'age', 'paleolatitude', 'label']
+    db_cols = ['pole_lat', 'pole_lon', 'age', 'paleolatitude', 'label', 'marker_color', 'source_file']
     if 'a95' in db_f.columns:
         db_cols.append('a95')
     t = db_f[db_cols].copy()
@@ -582,18 +638,28 @@ if not db_f.empty:
         t['a95'] = np.nan
     t['source'] = 'Research database'
     point_frames.append(t)
-all_points = pd.concat(point_frames, ignore_index=True) if point_frames else pd.DataFrame(columns=['pole_lat','pole_lon','age','paleolatitude','label','source'])
+
+all_points = pd.concat(point_frames, ignore_index=True) if point_frames else pd.DataFrame(
+    columns=['pole_lat', 'pole_lon', 'age', 'paleolatitude', 'label', 'source'])
+
 if len(all_points):
-    all_points['choice_label'] = [f"{i+1}. {row['source']} | {row['label']} | {row['age']:.2f} Ma | pole ({row['pole_lat']:.1f}°, {row['pole_lon']:.1f}°)" for i, row in all_points.iterrows()]
-    fig_stereo = stereonet_figure(all_points.rename(columns={'choice_label':'label'}), ref_lat=ref_lat, ref_lon=ref_lon)
-    st.plotly_chart(fig_stereo, use_container_width=True, config={"displaylogo": False, "responsive": True, "toImageButtonOptions": {"format": "svg", "filename": "paleomagnetic_poles_stereonet", "scale": 2}})
+    all_points['choice_label'] = [
+        f"{i + 1}. {row.get('source', '')} | {row.get('source_file', '')} | {row.get('label', '')} | {row['age']:.2f} Ma | pole ({row['pole_lat']:.1f}°, {row['pole_lon']:.1f}°)"
+        for i, row in all_points.iterrows()]
+    fig_stereo = stereonet_figure(all_points.rename(columns={'choice_label': 'label'}), ref_lat=ref_lat,
+                                  ref_lon=ref_lon)
+    st.plotly_chart(fig_stereo, use_container_width=True, config={"displaylogo": False, "responsive": True,
+                                                                  "toImageButtonOptions": {"format": "svg",
+                                                                                           "filename": "paleomagnetic_poles_stereonet",
+                                                                                           "scale": 2}})
     vector_export(fig_stereo, 'paleomagnetic_poles_schmidt_stereonet', 'stereo_export')
 else:
     st.info('当前年龄范围内没有可绘制的极点。')
 
 # ----------------------------- Small-circle comparison -----------------------------
 st.header('3. 小圆弧分析：比较同一参考点下多个极点的古纬度')
-st.markdown('对于给定参考点，具有相同古纬度的所有可能极点构成以参考点为球面中心的等角距小圆。可同时选择多个极点，并在同一张 Schmidt 等面积网投影图上显示各自对应的小圆。古纬度差按球面几何计算，不使用投影图上的平面距离代替。')
+st.markdown(
+    '对于给定参考点，具有相同古纬度的所有可能极点构成以参考点为球面中心的等角距小圆。可同时选择多个极点，并在同一张 Schmidt 等面积网投影图上显示各自对应的小圆。古纬度差按球面几何计算，不使用投影图上的平面距离代替。')
 if len(all_points) >= 2:
     choices = all_points['choice_label'].tolist()
     default_choices = choices[:min(2, len(choices))]
@@ -603,10 +669,11 @@ if len(all_points) >= 2:
     )
     if len(selected_choices) >= 2:
         selected_rows = all_points.loc[all_points['choice_label'].isin(selected_choices)].copy()
-        # Preserve the order selected by the user rather than the original table order.
-        selected_rows['_selection_order'] = selected_rows['choice_label'].map({v: i for i, v in enumerate(selected_choices)})
+        selected_rows['_selection_order'] = selected_rows['choice_label'].map(
+            {v: i for i, v in enumerate(selected_choices)})
         selected_rows = selected_rows.sort_values('_selection_order').drop(columns='_selection_order')
-        palette = ['#2ca02c', '#9467bd', '#ff7f0e', '#17becf', '#e377c2', '#8c564b', '#bcbd22', '#7f7f7f', '#1f77b4', '#d62728']
+        palette = ['#2ca02c', '#9467bd', '#ff7f0e', '#17becf', '#e377c2', '#8c564b', '#bcbd22', '#7f7f7f', '#1f77b4',
+                   '#d62728']
         first_palat = None
         result_rows = []
         circle_rows = []
@@ -616,11 +683,12 @@ if len(all_points) >= 2:
             if first_palat is None:
                 first_palat = palat
             color = palette[i % len(palette)]
-            short_label = f'{i+1}. {row["source"]} | {row["label"]}'
+            short_label = f'{i + 1}. {row.get("source", "")} | {row.get("source_file", "")} | {row.get("label", "")}'
             result_rows.append({
                 '顺序': i + 1,
-                '数据来源': row['source'],
-                '极点': row['label'],
+                '数据来源': row.get('source', ''),
+                '文件名': row.get('source_file', ''),
+                '极点': row.get('label', ''),
                 '年龄 (Ma)': float(row['age']),
                 '极点纬度 (°)': float(row['pole_lat']),
                 '极点经度 (°)': float(row['pole_lon']),
@@ -628,7 +696,7 @@ if len(all_points) >= 2:
                 '球面角距 (°)': dist,
                 '相对第一个极点的古纬度差 (°)': palat - first_palat,
             })
-            circle_rows.append((row, f'{i+1}. small circle ({dist:.1f}°)', color))
+            circle_rows.append((row, f'{i + 1}. small circle ({dist:.1f}°)', color))
         st.dataframe(pd.DataFrame(result_rows).style.format({
             '年龄 (Ma)': '{:.2f}', '极点纬度 (°)': '{:.2f}', '极点经度 (°)': '{:.2f}',
             '古纬度 (°)': '{:.2f}', '球面角距 (°)': '{:.2f}',
@@ -642,7 +710,10 @@ if len(all_points) >= 2:
             )
             fig_small.update_layout(title='Selected poles and equal-paleolatitude small circles on Schmidt net')
             polish_figure(fig_small, height=700)
-            st.plotly_chart(fig_small, use_container_width=True, config={"displaylogo": False, "responsive": True, "toImageButtonOptions": {"format": "svg", "filename": "paleomagnetic_plot", "scale": 2}})
+            st.plotly_chart(fig_small, use_container_width=True, config={"displaylogo": False, "responsive": True,
+                                                                         "toImageButtonOptions": {"format": "svg",
+                                                                                                  "filename": "paleomagnetic_plot",
+                                                                                                  "scale": 2}})
             vector_export(fig_small, 'small_circle_paleolatitude_comparison', 'smallcircle_export')
     elif len(selected_choices) == 1:
         st.info('请至少再选择一个极点，才能比较不同极点的古纬度。')
@@ -656,13 +727,16 @@ st.header('4. 数据表与导出')
 if not apwp.empty:
     with st.expander('查看 APWP 数据（含计算古纬度）'):
         st.dataframe(apwp, use_container_width=True)
-    st.download_button('下载 APWP 计算结果 CSV', data=apwp.to_csv(index=False).encode('utf-8-sig'), file_name='apwp_paleolatitude_results.csv', mime='text/csv', key='apwp_csv')
+    st.download_button('下载 APWP 计算结果 CSV', data=apwp.to_csv(index=False).encode('utf-8-sig'),
+                       file_name='apwp_paleolatitude_results.csv', mime='text/csv', key='apwp_csv')
 if not database.empty:
     with st.expander('查看 Research database（含倒转状态与计算古纬度）'):
         st.dataframe(database, use_container_width=True)
-    st.download_button('下载 Research database 计算结果 CSV', data=database.to_csv(index=False).encode('utf-8-sig'), file_name='research_database_paleolatitude_results.csv', mime='text/csv', key='database_csv')
+    st.download_button('下载 Research database 计算结果 CSV', data=database.to_csv(index=False).encode('utf-8-sig'),
+                       file_name='research_database_paleolatitude_results.csv', mime='text/csv', key='database_csv')
 if len(all_points):
-    st.download_button('下载当前筛选的全部极点 CSV', data=all_points.to_csv(index=False).encode('utf-8-sig'), file_name='filtered_paleomagnetic_poles.csv', mime='text/csv', key='all_points_csv')
+    st.download_button('下载当前筛选的全部极点 CSV', data=all_points.to_csv(index=False).encode('utf-8-sig'),
+                       file_name='filtered_paleomagnetic_poles.csv', mime='text/csv', key='all_points_csv')
 
 with st.expander('计算方法与注意事项'):
     st.markdown('''
@@ -671,5 +745,5 @@ with st.expander('计算方法与注意事项'):
 - 赤平投影使用 Schmidt 等面积网；南半球极点为便于同图显示折叠到上半球。原始坐标保留在悬停信息中。
 - A95 用于赤平投影图上的极点置信圆，并用于古纬度误差棒和阴影带的近似表示；后两者**不是严格的球面误差传播**。若需要严谨的古纬度不确定度，应基于极点置信锥在球面上进行蒙特卡洛传播。
 - 年龄误差只有在表格提供 `min_age`/`max_age` 或 `age_error` 时才会绘制。
-- SVG/PDF 导出需要安装与当前 Plotly 兼容的 `kaleido`。导出失败时，页面会给出错误信息文件和安装提示。
+- SVG/PDF 导出需要安装与当前 Plotly 兼容的 `kaleido`。云端环境若不支持，可直接点击图表右上角相机图标下载 PNG。
 ''')
